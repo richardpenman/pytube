@@ -1,3 +1,9 @@
+#
+# Description: pytube is a Python script to download flash video from various video websites
+# Author: Richard Penman (see http://code.google.com/p/pytube/)
+#
+
+
 import sys
 import re
 import urllib2
@@ -10,12 +16,12 @@ VIDEO_DATA = [
     ('youtube.com', '%7C(.*?videoplayback.*?)%2C'),
     ('metacafe.com', '&mediaURL=(.*?)&'),
 ]
-# default user agent used to download urls
-USER_AGENT = 'Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.0.13) Gecko/2009080315 Ubuntu/9.04 (jaunty) Firefox/3.0.13'
+# default user agent to use when downloading
+USER_AGENT = 'pytube'
 
 
 
-def scrape(url, html=None, output=None):
+def scrape(url, html=None, user_agent=None, output=None):
     """Scrape video location from given url. 
 
     Use html instead of downloading if passed.
@@ -25,47 +31,46 @@ def scrape(url, html=None, output=None):
     netloc = urlparse.urlsplit(url).netloc
     for domain, video_re in VIDEO_DATA:
         if domain in netloc:
-            if html is None:
-                print "Downloading webpage from `%s' ..." % domain
-                html = download(url).read()
+            html = html if html else download(url, user_agent).read()
             search = re.search(video_re, html)
             if search:
                 flash_url = urllib2.unquote(search.group(1))
-                print "Found flash video `%s'" % flash_url
                 if output:
                     print "Downloading flash to `%s' ..." % output
-                    open(output, 'wb').write(download(flash_url).read())
+                    open(output, 'wb').write(download(flash_url, user_agent).read())
                 return flash_url
             else:
-                print 'Failed to locate video'
-                return None
-    print 'URL did not match'
+                raise PyTubeException('Failed to locate video regular expression in downloaded HTML')
+    raise PyTubeException('URL did not match available domains')
 
 
-def download(url):
+def download(url, user_agent=None):
     """Download url and return data
     """
-    print USER_AGENT
-    headers = {'User-Agent' : USER_AGENT}
+    headers = {'User-Agent' : user_agent}
     req = urllib2.Request(url, None, headers)
     return urllib2.urlopen(req)
 
 
+class PyTubeException(Exception):
+    pass
+
+
+
 if __name__ == '__main__':
-    parser = OptionParser(usage='usage: %prog, [-o file.flv -s -h] url')
+    # parse command line options
+    parser = OptionParser(usage='usage: %prog, [-o <file.flv> -a <user_agent> -s -h] url')
     parser.add_option('-o', '--output', dest='output', help='Output file to download flash file to. If this is not specified file will not be downloaded.')
     parser.add_option('-s', '--sites', action='store_true', default=False, dest='sites', help='Display sites that pytube supports, then quit.')
-    parser.add_option('-a', '--agent', dest='agent', help='Override default user-agent for downloading webpages.') 
+    parser.add_option('-a', '--agent', dest='user_agent', default=USER_AGENT, help='Set user-agent for downloads.') 
     options, args = parser.parse_args()
     if options.sites:
         print '\n'.join(domain for (domain, reg) in VIDEO_DATA)
     else:
         if args:
-            if options.agent:
-                global USER_AGENT
-                USER_AGENT = options.agent
-            scrape(args[0], output=options.output)
+            flash_url = scrape(args[0], user_agent=options.user_agent, output=options.output)
+            if flash_url:
+                print flash_url
         else:
             print 'Need to pass the url of the video you want to download'
             parser.print_help()
-
