@@ -18,6 +18,8 @@ VIDEO_DATA = [
 ]
 # default user agent to use when downloading
 USER_AGENT = 'pytube'
+# size of file to download
+CHUNK_SIZE = 1024 * 1024
 
 
 
@@ -36,8 +38,19 @@ def scrape(url, html=None, user_agent=None, output=None):
             if search:
                 flash_url = urllib2.unquote(search.group(1))
                 if output:
-                    print "Downloading flash to `%s' ..." % output
-                    open(output, 'wb').write(download(flash_url, user_agent).read())
+                    print "Downloading flash to `%s'" % output,
+                    #open(output, 'wb').write(download(flash_url, user_agent).read())
+                    req = download(flash_url, user_agent)
+                    with open(output, 'wb') as fp:
+                        chunk = True
+                        while chunk:
+                            chunk = req.read(CHUNK_SIZE)
+                            if chunk:
+                                fp.write(chunk)
+                                #fp.flush()
+                                print '.',
+                                sys.stdout.flush()
+                    print
                 return flash_url
             else:
                 raise PyTubeException('Failed to locate video regular expression in downloaded HTML')
